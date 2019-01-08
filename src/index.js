@@ -47,9 +47,10 @@ async function start(fields) {
   // Get N26 account with N26 API
   const account = await new N26(fields.login, fields.password)
   const accountInfos = await account.account()
+
   // Get balance
   const balance = accountInfos.bankBalance
-  await lib.saveBalance(balance)
+  await saveBalance(balance)
 }
 
 // this shows authentication using the [signin function](https://github.com/konnectors/libs/blob/master/packages/cozy-konnector-libs/docs/api.md#module_signin)
@@ -81,7 +82,7 @@ function parseDocuments($) {
       title: 'div a',
       amount: {
         sel: 'div span',
-        parse: lib.normalizeAmount
+        parse: normalizeAmount
     },
       transaction_date: 'div time',
       id: {
@@ -91,7 +92,6 @@ function parseDocuments($) {
     },
     'li'
   )
-
   // Remove all items wich are waiting
   transactions = transactions.filter(transaction => transaction.transaction_date != "")
 
@@ -110,19 +110,20 @@ function parseDocuments($) {
   }))
 }
 
-// Functions
-module.exports = lib = {
-  saveBalance,
-  normalizeAmount
-}
-
-// Convert an amount string to a float
+/**
+ * Convert an amount string (ex: -5,12 €) to a float (ex: -5.12)
+ * @param String amount 
+ */
 function normalizeAmount(amount) {
   amount = amount.replace('−', '-')
   amount = amount.replace(',', '.')
   return parseFloat(amount.replace('€', '').trim())
 }
 
+/**
+ *  Save the actual account balance to Cozy Stack
+ * @param Int balance 
+ */
 function saveBalance(balance) {
   const data = {
     balance: balance, 

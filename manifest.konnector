@@ -29,8 +29,15 @@
   ],
   "screenshots": [],
   "permissions": {
-    "bank operations": {
+    "bank.operations": {
       "type": "io.cozy.bank.operations"
+    },
+    "bank.accounts": {
+      "description": "Required to save the bank account",
+      "type": "io.cozy.bank.accounts"
+    },
+    "bills": {
+      "type": "io.cozy.bills"
     },
     "files": {
       "type": "io.cozy.files"

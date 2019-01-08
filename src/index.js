@@ -1,13 +1,10 @@
 const {
-  BaseKonnector, //x the base connector (parent class)
+  BaseKonnector, // the base connector (parent class)
   requestFactory, // to make an http request to site using a parser : json or html
-  signin, // to connect to page
-  scrape,
   addData, // to save data to cozy
-  hydrateAndFilter,
+  hydrateAndFilter, // for no duplication of data
   updateOrCreate,
-  log,
-  errors, // to retreive main errors
+  log
 } = require('cozy-konnector-libs') // Needed libraries givent by Cozy
 
 const N26 = require('n26')
@@ -18,11 +15,8 @@ const request = requestFactory({
   // debug: true,
   cheerio: true, // If have to parse HTML to get data
   json: false, // If have to parse Json / deactivate if you use cheerio
-  // this allows request-promise to keep cookies between requests
   jar: true
 })
-
-const baseUrl = 'https://app.n26.com' // Base url of the site you want to retreive data
 
 module.exports = new BaseKonnector(start)
 
@@ -31,93 +25,38 @@ module.exports = new BaseKonnector(start)
 // the account information come from ./konnector-dev-config.json file
 async function start(fields) {
   log('info', 'Authenticating ...')
-  await authenticate(fields.login, fields.password)
+  const account = await authenticate(fields.login, fields.password)
   log('info', 'Successfully logged in')
-  // The BaseKonnector instance expects a Promise as return of the function
-  log('info', 'Fetching the list of transactions')
-  const $ = await request(`${baseUrl}/transactions`) // Cheerio
-  log('info', 'Parsing list of transactions')
-  const transactions = await parseDocuments($)
-  // here we use the saveBills function even if what we fetch are not bills, but this is the most
-  // common case in connectors
-  log('info', 'Save data to Cozy')
-  const notAlreadySavedTransactions = await hydrateAndFilter(transactions, 'io.cozy.bank.operations', {keys: ['id']})
-  await addData(transactions, 'io.cozy.bank.operations')
 
-  // Get N26 account with N26 API
-  const account = await new N26(fields.login, fields.password)
+  log('info', 'Getting Account infos')
   const accountInfos = await account.account()
 
-  // Get balance
-  const balance = accountInfos.bankBalance
-  await saveBalance(balance)
-}
+  log('info', 'Fetching transactions')
+  const transactions = await account.transactions({})
 
-// this shows authentication using the [signin function](https://github.com/konnectors/libs/blob/master/packages/cozy-konnector-libs/docs/api.md#module_signin)
-// even if this in another domain here, but it works as an example
-function authenticate(username, password) {
-  return signin({
-    url: `https://app.n26.com/login`,
-    formSelector: 'form',
-    formData: {username, password },
-    // the validate function will check if the login request was a success. Every website has
-    // different ways respond: http status code, error message in html ($), http redirection
-    // (fullResponse.request.uri.href)...
-    validate: (statusCode, $) => {
-      // If this div has no children : user logged in
-      log('info', $('#login-errors').children().length)
-      return $('#login-errors').children().length === 0 || log('error', 'Invalid credentials') 
-    }
-  })
-}
+  log('info', 'Save transactions to Cozy')
+  await saveTransactions(transactions)
 
-// The goal of this function is to parse a html page wrapped by a cheerio instance
-// and return an array of js objects which will be saved to the cozy by saveBills (https://github.com/konnectors/libs/blob/master/packages/cozy-konnector-libs/docs/api.md#savebills)
-function parseDocuments($) {
-  // you can find documentation about the scrape function here :
-  // https://github.com/konnectors/libs/blob/master/packages/cozy-konnector-libs/docs/api.md#scrape
-  var transactions = scrape(
-    $,
-    {
-      title: 'div a',
-      amount: {
-        sel: 'div span',
-        parse: normalizeAmount
-    },
-      transaction_date: 'div time',
-      id: {
-        sel: 'div a',
-        attr: 'href'
-      }
-    },
-    'li'
-  )
-  // Remove all items wich are waiting
-  transactions = transactions.filter(transaction => transaction.transaction_date != "")
-
-  return transactions.map(transaction => (
-    {
-    ...transaction,
-    currency: '€',
-    vendor: 'n26',
-    metadata: {
-      // it can be interesting that we add the date of import. This is not mandatory but may be
-      // useful for debugging or data migration
-      importDate: new Date(),
-      // document version, useful for migration after change of document structure
-      version: 1
-    }
-  }))
+  log('info', 'Save account balance to Cozy')
+  await saveBalance(accountInfos.bankBalance)
 }
 
 /**
- * Convert an amount string (ex: -5,12 €) to a float (ex: -5.12)
- * @param String amount 
+ * Authenticate user to n26 with username and password
+ * @param String username 
+ * @param String password 
  */
-function normalizeAmount(amount) {
-  amount = amount.replace('−', '-')
-  amount = amount.replace(',', '.')
-  return parseFloat(amount.replace('€', '').trim())
+function authenticate(username, password) {
+  return new N26(username, password)
+}
+
+/**
+ * Save transactions to Cozy Stack
+ * @param [] transactions 
+ */
+function saveTransactions(transactions) {
+  const notAlreadySavedTransactions = hydrateAndFilter(transactions, 'io.cozy.bank.operations', {keys: ['id']})
+  addData(notAlreadySavedTransactions, 'io.cozy.bank.operations')
 }
 
 /**

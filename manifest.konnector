@@ -24,8 +24,7 @@
     }
   },
   "data_types": [
-    "bankTransactions",
-    "bankAccounts"
+    "bankTransactions"
   ],
   "screenshots": [],
   "permissions": {

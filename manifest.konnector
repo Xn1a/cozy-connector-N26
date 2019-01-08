@@ -4,8 +4,8 @@
   "type": "konnector",
   "language": "node",
   "icon": "icon.png",
-  "slug": "n26-without-api",
-  "source": "https://github.com/Xn1a/cozy-connector-N26.git",
+  "slug": "n26",
+  "source": "git://github.com/Xn1a/cozy-connector-N26.git",
   "editor": "Cozy",
   "vendor_link": "https://app.n26.com",
   "categories": ["banking"],
@@ -24,7 +24,8 @@
     }
   },
   "data_types": [
-    "bill"
+    "bankTransactions",
+    "bankAccounts"
   ],
   "screenshots": [],
   "permissions": {

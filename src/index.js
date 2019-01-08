@@ -5,9 +5,12 @@ const {
   scrape,
   addData, // to save data to cozy
   hydrateAndFilter,
+  updateOrCreate,
   log,
   errors, // to retreive main errors
 } = require('cozy-konnector-libs') // Needed libraries givent by Cozy
+
+const N26 = require('n26')
 
 const request = requestFactory({
   // the debug mode shows all the details about http request and responses. Very useful for
@@ -37,9 +40,16 @@ async function start(fields) {
   const transactions = await parseDocuments($)
   // here we use the saveBills function even if what we fetch are not bills, but this is the most
   // common case in connectors
-  log('info', 'Save data to Cozy if not already exists')
+  log('info', 'Save data to Cozy')
   const notAlreadySavedTransactions = await hydrateAndFilter(transactions, 'io.cozy.bank.operations', {keys: ['id']})
   await addData(transactions, 'io.cozy.bank.operations')
+
+  // Get N26 account with N26 API
+  const account = await new N26(fields.login, fields.password)
+  const accountInfos = await account.account()
+  // Get balance
+  const balance = accountInfos.bankBalance
+  await lib.saveBalance(balance)
 }
 
 // this shows authentication using the [signin function](https://github.com/konnectors/libs/blob/master/packages/cozy-konnector-libs/docs/api.md#module_signin)
@@ -71,7 +81,7 @@ function parseDocuments($) {
       title: 'div a',
       amount: {
         sel: 'div span',
-        parse: normalizeAmount
+        parse: lib.normalizeAmount
     },
       transaction_date: 'div time',
       id: {
@@ -88,9 +98,6 @@ function parseDocuments($) {
   return transactions.map(transaction => (
     {
     ...transaction,
-    // the saveBills function needs a date field
-    // even if it is a little artificial here (these are not real bills)
-    date: new Date(),
     currency: '€',
     vendor: 'n26',
     metadata: {
@@ -98,9 +105,15 @@ function parseDocuments($) {
       // useful for debugging or data migration
       importDate: new Date(),
       // document version, useful for migration after change of document structure
-      version: 1 // #TODO et amount contien du text
-    } // #TODO et amount contien du text
+      version: 1
+    }
   }))
+}
+
+// Functions
+module.exports = lib = {
+  saveBalance,
+  normalizeAmount
 }
 
 // Convert an amount string to a float
@@ -108,4 +121,14 @@ function normalizeAmount(amount) {
   amount = amount.replace('−', '-')
   amount = amount.replace(',', '.')
   return parseFloat(amount.replace('€', '').trim())
+}
+
+function saveBalance(balance) {
+  const data = {
+    balance: balance, 
+    metadata: {
+      importDate: new Date(),
+      version: 1
+    }} 
+  return updateOrCreate([data], 'io.cozy.bank.balancehistories', ['_id'])
 }

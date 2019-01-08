@@ -39,6 +39,9 @@ async function start(fields) {
 
   log('info', 'Save account balance to Cozy')
   await saveBalance(accountInfos.bankBalance)
+
+  log('info', 'Save account infos to Cozy')
+  await saveAccount(accountInfos)
 }
 
 /**
@@ -71,4 +74,19 @@ function saveBalance(balance) {
       version: 1
     }} 
   return updateOrCreate([data], 'io.cozy.bank.balancehistories', ['_id'])
+}
+
+/**
+ * Save N26 account to Cozy
+ * @param Object accountInfos
+ */
+function saveAccount(accountInfos) {
+  const data = {
+    num: accountInfos.id,
+    bank: accountInfos.bankName,
+    iban: accountInfos.iban,
+    bic: accountInfos.bic,
+    currency: accountInfos.currency
+  }
+  return updateOrCreate([data], 'io.cozy.bank.accounts', ['num', 'iban', 'bic'])
 }

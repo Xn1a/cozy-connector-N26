@@ -4,7 +4,7 @@
   "description": "N26 connector that connect to N26 without the API to retreave all your transactions",
   "repository": {
     "type": "git",
-    "url": "git+https://gitote.in/xn1a/cozy-connector-n26-without-api.git"
+    "url": "git+https://github.com/Xn1a/cozy-connector-N26.git"
   },
   "keywords": [],
   "author": "Xn1a",

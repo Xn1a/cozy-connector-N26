@@ -3,7 +3,8 @@ const {
   requestFactory, // to make an http request to site using a parser : json or html
   signin, // to connect to page
   scrape,
-  saveBills, // to save data to cozy
+  addData, // to save data to cozy
+  hydrateAndFilter,
   log,
   errors, // to retreive main errors
 } = require('cozy-konnector-libs') // Needed libraries givent by Cozy
@@ -36,13 +37,9 @@ async function start(fields) {
   const transactions = await parseDocuments($)
   // here we use the saveBills function even if what we fetch are not bills, but this is the most
   // common case in connectors
-  log('info', 'Saving data to Cozy')
-  await saveBills(transactions, fields, {
-    // this is a bank identifier which will be used to link bills to bank operations. These
-    // identifiers should be at least a word found in the title of a bank operation related to this
-    // bill. It is not case sensitive.
-    identifiers: ['transactions']
-  })
+  log('info', 'Save data to Cozy if not already exists')
+  const notAlreadySavedTransactions = await hydrateAndFilter(transactions, 'io.cozy.bank.operations', {keys: ['id']})
+  await addData(transactions, 'io.cozy.bank.operations')
 }
 
 // this shows authentication using the [signin function](https://github.com/konnectors/libs/blob/master/packages/cozy-konnector-libs/docs/api.md#module_signin)
@@ -56,7 +53,7 @@ function authenticate(username, password) {
     // different ways respond: http status code, error message in html ($), http redirection
     // (fullResponse.request.uri.href)...
     validate: (statusCode, $) => {
-      // Logged if this div has no children
+      // If this div has no children : user logged in
       log('info', $('#login-errors').children().length)
       return $('#login-errors').children().length === 0 || log('error', 'Invalid credentials') 
     }
@@ -76,13 +73,17 @@ function parseDocuments($) {
         sel: 'div span',
         parse: normalizeAmount
     },
-      transaction_date: 'div time'
+      transaction_date: 'div time',
+      id: {
+        sel: 'div a',
+        attr: 'href'
+      }
     },
-    'li' // #TODO: get div puis 2nd(title:a / date:time) et 3ème div(amount:span)
+    'li'
   )
 
   // Remove all items wich are waiting
-  transactions = transactions.filter(transaction => transaction.transaction_date != "") // #TODO et amount contien du text
+  transactions = transactions.filter(transaction => transaction.transaction_date != "")
 
   return transactions.map(transaction => (
     {

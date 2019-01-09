@@ -31,6 +31,9 @@ async function start(fields) {
   log('info', 'Getting Account infos')
   const accountInfos = await account.account()
 
+  log('info', 'Getting User infos')
+  const userInfos = await account.me(false)
+
   log('info', 'Fetching transactions')
   const transactions = await account.transactions({})
 
@@ -41,7 +44,7 @@ async function start(fields) {
   await saveBalance(accountInfos.bankBalance)
 
   log('info', 'Save account infos to Cozy')
-  await saveAccount(accountInfos)
+  await saveAccount(userInfos, accountInfos)
 }
 
 /**
@@ -80,13 +83,18 @@ function saveBalance(balance) {
  * Save N26 account to Cozy
  * @param Object accountInfos
  */
-function saveAccount(accountInfos) {
+function saveAccount(userInfos, accountInfos) {
+  log('info', accountInfos)
   const data = {
-    num: accountInfos.id,
-    bank: accountInfos.bankName,
+    label: userInfos.firstName+' '+userInfos.lastName,
+    institutionLabel: accountInfos.bankName,
+    balance: accountInfos.bankBalance,
+    type: 'bank',
+    number: accountInfos.iban.slice(12),
     iban: accountInfos.iban,
-    bic: accountInfos.bic,
-    currency: accountInfos.currency
+    metadata: {
+      version: 1
+    },
   }
-  return updateOrCreate([data], 'io.cozy.bank.accounts', ['num', 'iban', 'bic'])
+  return updateOrCreate([data], 'io.cozy.bank.accounts', ['number', 'iban'])
 }

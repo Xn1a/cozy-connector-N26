@@ -6,9 +6,9 @@ const {
   updateOrCreate,
   signin,
   log
-} = require('cozy-konnector-libs') // Needed libraries givent by Cozy
+} = require('cozy-konnector-libs') // Required libraries to developpe a konnector
 
-const N26 = require('n26')
+const N26 = require('n26') // N26 API
 
 const request = requestFactory({
   // the debug mode shows all the details about http request and responses. Very useful for
@@ -21,13 +21,11 @@ const request = requestFactory({
 
 module.exports = new BaseKonnector(start)
 
+// Urls
 const baseUrl = 'https://app.n26.com'
 const transactionsUrl = `${baseUrl}/transactions`
 const loginUrl = `${baseUrl}/login`
 
-// The start function is run by the BaseKonnector instance only when it got all the account
-// information (fields). When you run this connector yourself in "standalone" mode or "dev" mode,
-// the account information come from ./konnector-dev-config.json file
 async function start(fields) {
   log('info', 'Authenticating ...')
   const account = await authenticate(fields.login, fields.password)
@@ -131,6 +129,11 @@ function saveAccount(userInfos, accountInfos) {
   return updateOrCreate([data], 'io.cozy.bank.accounts', ['number', 'iban'])
 }
 
+/**
+ * Get the transaction's date from Cheerio
+ * @param String id 
+ * @param Cheerio $ 
+ */
 function getTransactionDate(id, $) {
   const a = $(`a[href="/transactions/${id}"]`, '#transactions')
   const div = a.parent()
@@ -138,6 +141,12 @@ function getTransactionDate(id, $) {
   return datetime
 }
 
+/**
+ * Authenticate user with Cheerio to be able to get transaction's date 
+ * wich is not available on the N26 API
+ * @param String username 
+ * @param String password 
+ */
 function authenticateWithCheerio(username, password) {
   return signin({
     url: loginUrl,

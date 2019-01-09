@@ -66,7 +66,6 @@ function authenticate(username, password) {
  * @param [] transactions 
  */
 function saveTransactions(transactions, $) {
-  //TODO: map transaction an d change content
   transactions.map((transaction, index) => {
     // Get datetime
     const date = getTransactionDate(transaction.id, $)

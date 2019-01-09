@@ -4,6 +4,7 @@ const {
   addData, // to save data to cozy
   hydrateAndFilter, // for no duplication of data
   updateOrCreate,
+  signin,
   log
 } = require('cozy-konnector-libs') // Needed libraries givent by Cozy
 
@@ -20,6 +21,10 @@ const request = requestFactory({
 
 module.exports = new BaseKonnector(start)
 
+const baseUrl = 'https://app.n26.com'
+const transactionsUrl = `${baseUrl}/transactions`
+const loginUrl = `${baseUrl}/login`
+
 // The start function is run by the BaseKonnector instance only when it got all the account
 // information (fields). When you run this connector yourself in "standalone" mode or "dev" mode,
 // the account information come from ./konnector-dev-config.json file
@@ -35,10 +40,11 @@ async function start(fields) {
   const userInfos = await account.me(false)
 
   log('info', 'Fetching transactions')
+  const $ = await request(transactionsUrl) // For cheerio to get datetime of transaction (not providing by API)
   const transactions = await account.transactions({})
 
   log('info', 'Save transactions to Cozy')
-  await saveTransactions(transactions)
+  await saveTransactions(transactions, $)
 
   log('info', 'Save account balance to Cozy')
   await saveBalance(accountInfos.bankBalance)
@@ -53,6 +59,7 @@ async function start(fields) {
  * @param String password 
  */
 function authenticate(username, password) {
+  authenticateWithCheerio(username, password) // For cheerio to get transaction datetime
   return new N26(username, password)
 }
 
@@ -60,7 +67,34 @@ function authenticate(username, password) {
  * Save transactions to Cozy Stack
  * @param [] transactions 
  */
-function saveTransactions(transactions) {
+function saveTransactions(transactions, $) {
+  //TODO: map transaction an d change content
+  transactions.map(transaction => {
+    log('info', transaction)
+
+    // Get datetime
+    const date = getTransactionDate(transaction.id, $)
+
+    // Choose right type
+    let type
+    if(transaction.type == 'DT')
+      type = 'direct debit' // Envoie d'argent dans un espace N26
+    if(transaction.type == 'CT')
+      type = 'transfert' // Une personnes m'envoie de l'argent depuis son compte
+    if(transaction.type == 'PT')
+      type = 'cash' // Retrait à un distributeur
+    if(transaction.type == 'WU')
+      type = 'none' // Virement de la part de la banque 
+
+    transaction = {
+      label: transaction.referenceText,
+      type: type,
+      amount: transaction.amount,
+      currency: transaction.currencyCode,
+      dateImport: new Date(),
+      date: date,
+    }
+  })
   const notAlreadySavedTransactions = hydrateAndFilter(transactions, 'io.cozy.bank.operations', {keys: ['id']})
   addData(notAlreadySavedTransactions, 'io.cozy.bank.operations')
 }
@@ -84,7 +118,6 @@ function saveBalance(balance) {
  * @param Object accountInfos
  */
 function saveAccount(userInfos, accountInfos) {
-  log('info', accountInfos)
   const data = {
     label: userInfos.firstName+' '+userInfos.lastName,
     institutionLabel: accountInfos.bankName,
@@ -97,4 +130,24 @@ function saveAccount(userInfos, accountInfos) {
     },
   }
   return updateOrCreate([data], 'io.cozy.bank.accounts', ['number', 'iban'])
+}
+
+function getTransactionDate(id, $) {
+  const a = $(`a[href="/transactions/${id}"]`, '#transactions')
+  const div = a.parent()
+  const datetime = $('time', div).attr('datetime')
+  return datetime
+}
+
+function authenticateWithCheerio(username, password) {
+  return signin({
+    url: loginUrl,
+    formSelector: 'form',
+    formData: {username, password},
+    validate: (statusCode, $) => {
+      // Logged if this div has no children
+      log('info', $('#login-errors').children().length)
+      return $('#login-errors').children().length === 0 || log('error', 'Invalid credentials') 
+    }
+  })
 }

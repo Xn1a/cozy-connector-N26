@@ -54,8 +54,8 @@
   "langs": ["fr", "en"],
   "locales": {
     "fr": {
-      "short_description": "Template de connecteur",
-      "long_description": "Ce template récupère la liste des transactions réalisées sur N26",
+      "short_description": "Récupère votre compte N26 et toutes vos transactions bancaires",
+      "long_description": "Ce connecteur récupère les informations de votre compte bancaire et la liste de vos transactions réalisées sur N26",
       "permissions": {
         "bank operations": {
           "description": "Utilisé pour relier les factures à des operations bancaires"
@@ -72,8 +72,8 @@
       }
     },
     "en": {
-      "short_description": "Connector template",
-      "long_description": "This template fetches a list of transactions from N26 bank",
+      "short_description": "Fetch you bank account and your bank operations",
+      "long_description": "This connector fetches your N26 account informations and your list of transactions from N26 bank",
       "permissions": {
         "bank operations": {
           "description": "Required to link bank operations to bills"
@@ -90,6 +90,6 @@
       }
     }
   },
-  "banksTransactionRegExp": "\\bbooks\\b",
+  "banksTransactionRegExp": "\\bn26\\b",
   "manifest_version": "2"
 }
